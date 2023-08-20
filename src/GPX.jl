@@ -66,7 +66,6 @@ Providing rich, meaningful information about your GPX files allows others to sea
 - `time`: The creation date of the file.
 - `keywords`: Keywords associated with the file. Search engines or databases can use this information to classify the data.
 - `bounds`: Minimum and maximum coordinates which describe the extent of the coordinates in the file.
-- `extensions`:
 """
 struct GPXMetadata
     name::String
@@ -82,7 +81,7 @@ GPXMetadata(; name="", desc="", author=GPXAuthor(""), copyright="", link="", tim
 
 
 """
-    GPXPoint(lat::Float64, lon::Float64, ele::Float64, time::ZonedDateTime, desc::String)
+    GPXPoint(lat::Float64, lon::Float64, ele::Float64, time::ZonedDateTime, desc::String, extensions::Dict)
 
 A geographic point with optional elevation and time. Available for use by other schemas.
 
@@ -94,6 +93,7 @@ A Track Point holds the coordinates, elevation, timestamp, and metadata for a si
 - `ele`: The elevation (in meters) of the point.
 - `time`: The time that the point was recorded.
 - `desc`: A text description of the element.
+- `extensions`: Extension information used by Garmin.
 """
 struct GPXPoint
     lat::Float64
@@ -101,6 +101,7 @@ struct GPXPoint
     ele::Float64
     time::ZonedDateTime
     desc::String
+    extensions::Dict
 end
 
 """
@@ -268,6 +269,15 @@ function LightXML.XMLDocument(gpx::GPXDocument)
                     x_desc = new_child(x_trkpt, "desc")
                     add_text(x_desc, desc)
                 end
+                extensions = point.extensions
+                if extensions != ""
+                    x_extensions = new_child(x_trkpt, "extensions")
+                    x_trackpointsextensions = new_child(x_extensions, "gpxtpx:TrackPointExtension")
+                    for (key, val) in extensions
+                        x_gpxtpx = new_child(x_trackpointsextensions, "gpxtpx:"*key)
+                        add_text(x_gpxtpx, "$val")
+                    end
+                end
             end
         end
     end
@@ -295,6 +305,11 @@ function parse_gpx_string(s)
     return _parse_gpx(xdoc)
 end
 
+function _tryparse_string(type, s)
+    re = tryparse(type, s)
+    return isnothing(re) ? s : re
+end
+
 
 """
     _parse_gpx(xdoc::XMLDocument) -> GPXDocument
@@ -303,6 +318,8 @@ Parse `XMLDocument` and return a `GPXDocument`.
 """
 function _parse_gpx(xdoc::XMLDocument)
     gpxs = root(xdoc)
+
+    # attributes_dict(gpxs) #TODO
 
     metadata = GPXMetadata(
         name="title",
@@ -326,6 +343,7 @@ function _parse_gpx(xdoc::XMLDocument)
                             lon = parse(Float64, d_att["lon"])
                             ele = 0.0
                             desc = ""
+                            extensions = Dict()
                             for x_track_point in child_elements(x_track_segment)
                                 if name(x_track_point) == "time"
                                     s = content(x_track_point)
@@ -344,14 +362,21 @@ function _parse_gpx(xdoc::XMLDocument)
                                 elseif name(x_track_point) == "desc"
                                     desc = content(x_track_point)
                                     # desc = ""  # for debug
+                                elseif name(x_track_point) == "extensions"
+                                    for extension in child_elements(x_track_point)
+                                        if name(extension) == "TrackPointExtension"
+                                            [extensions[name(item)] = _tryparse_string(Float64, content(item)) for item in child_elements(extension)]
+                                        end
+                                    end
                                 end
                             end
-                            point = GPXPoint(lat, lon, ele, dt, desc)
+                            point = GPXPoint(lat, lon, ele, dt, desc, extensions)
                             push!(track_segment, point)
                         end
                     end
                 end
             end
+        # elseif name(x_gpx) == "wpt" #TODO
         end
     end
 
