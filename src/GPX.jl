@@ -15,6 +15,7 @@ export GPXAuthor, GPXMetadata, GPXPoint,
     GPXTrackSegment, GPXDocument, GPXRoute
 export read_gpx_file, parse_gpx_string
 export new_track, new_track_segment, last_segment
+export write_gpx_small
 
 # not exported but very useful: GPXTracks
 
@@ -164,7 +165,7 @@ struct GPXDocument
 	routes::Vector{GPXRoute}
     tracks::GPXTracks
 
-    function GPXDocument(metadata::GPXMetadata; tracks=GPXTracks(), namespaces=GPX_NS, version=GPX_VERSION, creator=GPX_CREATOR)
+    function GPXDocument(metadata=GPXMetadata()::GPXMetadata; tracks=GPXTracks(), namespaces=GPX_NS, version=GPX_VERSION, creator=GPX_CREATOR)
         waypoints = GPXPoint[]
         routes = GPXRoute[]
         new(namespaces, version, creator, metadata, waypoints, routes, tracks)
@@ -386,5 +387,16 @@ function _parse_gpx(xdoc::XMLDocument; extensions_flag=true)
 
     return gpx
 end
+
+function write_gpx_small(gpx, fname)
+    xdoc = XMLDocument(gpx);
+    save_file(xdoc, fname)
+
+    lines = readlines(fname)
+    open(fname, "w") do f
+        write(f, reduce(*, lines .|> strip))
+    end
+end
+
 
 end # module
