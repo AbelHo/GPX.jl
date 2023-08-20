@@ -270,7 +270,7 @@ function LightXML.XMLDocument(gpx::GPXDocument)
                     add_text(x_desc, desc)
                 end
                 extensions = point.extensions
-                if extensions != ""
+                if !isempty(extensions)
                     x_extensions = new_child(x_trkpt, "extensions")
                     x_trackpointsextensions = new_child(x_extensions, "gpxtpx:TrackPointExtension")
                     for (key, val) in extensions
@@ -290,9 +290,9 @@ end
 
 Read GPX file from filename `fname`.
 """
-function read_gpx_file(fname)
+function read_gpx_file(fname; kwargs...)
     xdoc = parse_file(fname)
-    return _parse_gpx(xdoc)
+    return _parse_gpx(xdoc; kwargs...)
 end
 
 """
@@ -300,9 +300,9 @@ end
 
 Parse GPX data from String `s`.
 """
-function parse_gpx_string(s)
+function parse_gpx_string(s; kwargs...)
     xdoc = parse_string(s)
-    return _parse_gpx(xdoc)
+    return _parse_gpx(xdoc; kwargs...)
 end
 
 function _tryparse_string(type, s)
@@ -316,7 +316,7 @@ end
 
 Parse `XMLDocument` and return a `GPXDocument`.
 """
-function _parse_gpx(xdoc::XMLDocument)
+function _parse_gpx(xdoc::XMLDocument; extensions_flag=true)
     gpxs = root(xdoc)
 
     # attributes_dict(gpxs) #TODO
@@ -362,7 +362,7 @@ function _parse_gpx(xdoc::XMLDocument)
                                 elseif name(x_track_point) == "desc"
                                     desc = content(x_track_point)
                                     # desc = ""  # for debug
-                                elseif name(x_track_point) == "extensions"
+                                elseif name(x_track_point) == "extensions" && extensions_flag
                                     for extension in child_elements(x_track_point)
                                         if name(extension) == "TrackPointExtension"
                                             [extensions[name(item)] = _tryparse_string(Float64, content(item)) for item in child_elements(extension)]
